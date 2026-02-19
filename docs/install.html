@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Install MCP Server</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: #1e293b; border-radius: 16px; padding: 48px; max-width: 560px; width: 90%; text-align: center; border: 1px solid #334155; }
+    .icon { font-size: 64px; margin-bottom: 16px; }
+    h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+    .subtitle { color: #94a3b8; font-size: 16px; margin-bottom: 32px; }
+    .status { padding: 16px; border-radius: 12px; margin-bottom: 24px; font-size: 15px; display: none; }
+    .status.success { background: #064e3b; border: 1px solid #059669; display: block; }
+    .status.error { background: #1e293b; border: 1px solid #334155; display: block; }
+    .status.loading { background: #1e293b; border: 1px solid #334155; display: block; color: #94a3b8; }
+    .btn { display: inline-block; padding: 14px 28px; border-radius: 10px; font-size: 16px; font-weight: 600; text-decoration: none; cursor: pointer; border: none; margin: 6px; transition: all 0.2s; }
+    .btn-primary { background: #8b5cf6; color: white; }
+    .btn-primary:hover { background: #7c3aed; }
+    .btn-secondary { background: #334155; color: #f8fafc; }
+    .btn-secondary:hover { background: #475569; }
+    .divider { color: #475569; margin: 20px 0; font-size: 13px; }
+    .config-box { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 16px; text-align: left; font-family: 'SF Mono', monospace; font-size: 13px; color: #94a3b8; margin-top: 16px; position: relative; overflow-x: auto; }
+    .copy-btn { position: absolute; top: 8px; right: 8px; background: #334155; border: none; color: #94a3b8; padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+    .copy-btn:hover { background: #475569; }
+    .hidden { display: none; }
+    .badge { display: inline-block; background: #8b5cf6; color: white; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; margin-left: 8px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon" id="icon">🔍</div>
+    <h1 id="name">brandcheck</h1>
+    <p class="subtitle" id="desc">Loading...</p>
+
+    <div id="status-loading" class="status loading">⏳ Checking for McpHub on localhost...</div>
+    <div id="status-success" class="status success hidden">✅ Installed! Restart your MCP client to activate.</div>
+    <div id="status-error" class="status error hidden"></div>
+
+    <div id="buttons">
+      <a id="cursor-btn" class="btn btn-primary" href="#">
+        <img src="https://cursor.com/deeplink/mcp-install-dark.svg" alt="Install in Cursor" style="height:32px;vertical-align:middle;" />
+      </a>
+      <div class="divider">or install manually</div>
+      <button class="btn btn-secondary" onclick="toggleConfig()">Show config JSON</button>
+    </div>
+
+    <div id="config-section" class="hidden">
+      <div class="config-box">
+        <button class="copy-btn" onclick="copyConfig()">Copy</button>
+        <pre id="config-json"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Parse URL params
+    const params = new URLSearchParams(window.location.search);
+    const name = params.get('name') || 'unknown';
+    const configB64 = params.get('config') || '';
+    let config = {};
+    try { config = JSON.parse(atob(configB64)); } catch(e) {}
+
+    // Known servers metadata
+    const servers = {
+      brandcheck: { icon: '🔍', desc: 'Check brand name availability across 27 platforms', color: '#8b5cf6' },
+      depsonar: { icon: '📡', desc: '9 languages, 23 tools. Scan, audit, update, migrate.', color: '#60a5fa' },
+    };
+
+    const meta = servers[name] || { icon: '📦', desc: 'MCP Server', color: '#8b5cf6' };
+    document.getElementById('icon').textContent = meta.icon;
+    document.getElementById('name').textContent = name;
+    document.getElementById('desc').textContent = meta.desc;
+
+    // Cursor deeplink
+    const cursorLink = `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(name)}&config=${configB64}`;
+    document.getElementById('cursor-btn').href = cursorLink;
+
+    // Config JSON for manual install
+    const mcpConfig = {
+      mcpServers: {
+        [name]: config.type === 'stdio'
+          ? { command: config.command, args: config.args }
+          : { url: config.url }
+      }
+    };
+    document.getElementById('config-json').textContent = JSON.stringify(mcpConfig, null, 2);
+
+    // Try McpHub localhost install
+    const MCPHUB_PORT = 24680;
+    const statusLoading = document.getElementById('status-loading');
+    const statusSuccess = document.getElementById('status-success');
+    const statusError = document.getElementById('status-error');
+
+    async function tryMcpHub() {
+      try {
+        const res = await fetch(`http://localhost:${MCPHUB_PORT}/api/install`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, config }),
+          signal: AbortSignal.timeout(3000),
+        });
+        if (res.ok) {
+          statusLoading.classList.add('hidden');
+          statusSuccess.classList.remove('hidden');
+          document.getElementById('icon').textContent = '✅';
+          return;
+        }
+      } catch(e) {}
+      // McpHub not running
+      statusLoading.classList.add('hidden');
+      statusError.innerHTML = 'McpHub not detected. Use the button below to install in Cursor, or copy the config for any MCP client.';
+      statusError.classList.remove('hidden');
+    }
+
+    tryMcpHub();
+
+    function toggleConfig() {
+      document.getElementById('config-section').classList.toggle('hidden');
+    }
+
+    function copyConfig() {
+      navigator.clipboard.writeText(JSON.stringify(mcpConfig, null, 2));
+      document.querySelector('.copy-btn').textContent = 'Copied!';
+      setTimeout(() => document.querySelector('.copy-btn').textContent = 'Copy', 2000);
+    }
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 {
   "name": "brandcheck",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "MCP server to check brand name availability across domains, social media, app stores, and trademark registries",
   "type": "module",
   "main": "dist/index.js",
@@ -20,6 +20,12 @@
     "@types/node": "^22.0.0",
     "typescript": "^5.7.0"
   },
-  "keywords": ["mcp", "brand", "domain", "trademark", "availability"],
+  "keywords": [
+    "mcp",
+    "brand",
+    "domain",
+    "trademark",
+    "availability"
+  ],
   "license": "MIT"
 }
